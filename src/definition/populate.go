@@ -70,9 +70,11 @@ func IntegrationPopulator(config *IntegrationPopulateConfig) (bool, []error) {
 				continue
 			}
 
-			ns, ok := metrics["namespace"].(string)
-			if ok && !config.Filterer.IsAllowed(ns) {
-				continue
+			if config.Filterer != nil {
+				ns, ok := metrics["namespace"].(string)
+				if ok && !config.Filterer.IsAllowed(ns) {
+					continue
+				}
 			}
 
 			msEntityID := entityID

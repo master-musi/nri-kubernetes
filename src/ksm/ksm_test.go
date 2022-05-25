@@ -21,6 +21,15 @@ import (
 	"github.com/newrelic/nri-kubernetes/v3/src/metric"
 )
 
+type NamespaceFilterMock struct{}
+
+func (nf NamespaceFilterMock) IsAllowed(namespace string) bool {
+	if namespace == "scraper" {
+		return false
+	}
+	return true
+}
+
 func TestScraper(t *testing.T) {
 	// Create an asserter with the settings that are shared for all test scenarios.
 	asserter := asserter.New().
