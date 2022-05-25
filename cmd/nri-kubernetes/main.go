@@ -18,6 +18,7 @@ import (
 	"github.com/newrelic/nri-kubernetes/v3/internal/config"
 	"github.com/newrelic/nri-kubernetes/v3/src/client"
 	"github.com/newrelic/nri-kubernetes/v3/src/controlplane"
+	"github.com/newrelic/nri-kubernetes/v3/src/definition"
 	"github.com/newrelic/nri-kubernetes/v3/src/integration"
 	"github.com/newrelic/nri-kubernetes/v3/src/ksm"
 	ksmClient "github.com/newrelic/nri-kubernetes/v3/src/ksm/client"
@@ -120,9 +121,11 @@ func main() {
 		os.Exit(exitClients)
 	}
 
+	namespaceFilterer := &definition.NamespaceFilter{}
+
 	var kubeletScraper *kubelet.Scraper
 	if c.Kubelet.Enabled {
-		kubeletScraper, err = setupKubelet(c, clients)
+		kubeletScraper, err = setupKubelet(c, clients, namespaceFilterer)
 		if err != nil {
 			logger.Errorf("setting up ksm scraper: %v", err)
 			os.Exit(exitSetup)
@@ -131,7 +134,7 @@ func main() {
 
 	var ksmScraper *ksm.Scraper
 	if c.KSM.Enabled {
-		ksmScraper, err = setupKSM(c, clients)
+		ksmScraper, err = setupKSM(c, clients, namespaceFilterer)
 		if err != nil {
 			logger.Errorf("setting up ksm scraper: %v", err)
 			os.Exit(exitSetup)
@@ -201,13 +204,13 @@ func runScrapers(c *config.Config, ksmScraper *ksm.Scraper, kubeletScraper *kube
 	return nil
 }
 
-func setupKSM(c *config.Config, clients *clusterClients) (*ksm.Scraper, error) {
+func setupKSM(c *config.Config, clients *clusterClients, filterer definition.NamespaceFilterer) (*ksm.Scraper, error) {
 	providers := ksm.Providers{
 		K8s: clients.k8s,
 		KSM: clients.ksm,
 	}
 
-	ksmScraper, err := ksm.NewScraper(c, providers, ksm.WithLogger(logger))
+	ksmScraper, err := ksm.NewScraper(c, providers, ksm.WithLogger(logger), ksm.WithFilterer(filterer))
 	if err != nil {
 		return nil, fmt.Errorf("building KSM scraper: %w", err)
 	}
@@ -238,13 +241,13 @@ func setupControlPlane(c *config.Config, clients *clusterClients) (*controlplane
 	return controlplaneScraper, nil
 }
 
-func setupKubelet(c *config.Config, clients *clusterClients) (*kubelet.Scraper, error) {
+func setupKubelet(c *config.Config, clients *clusterClients, filterer definition.NamespaceFilterer) (*kubelet.Scraper, error) {
 	providers := kubelet.Providers{
 		K8s:      clients.k8s,
 		Kubelet:  clients.kubelet,
 		CAdvisor: clients.cAdvisor,
 	}
-	ksmScraper, err := kubelet.NewScraper(c, providers, kubelet.WithLogger(logger))
+	ksmScraper, err := kubelet.NewScraper(c, providers, kubelet.WithLogger(logger), kubelet.WithFilterer(filterer))
 	if err != nil {
 		return nil, fmt.Errorf("building kubelet scraper: %w", err)
 	}

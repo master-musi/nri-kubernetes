@@ -14,6 +14,7 @@ import (
 	"github.com/newrelic/nri-kubernetes/v3/internal/logutil"
 	"github.com/newrelic/nri-kubernetes/v3/src/client"
 	"github.com/newrelic/nri-kubernetes/v3/src/data"
+	"github.com/newrelic/nri-kubernetes/v3/src/definition"
 	"github.com/newrelic/nri-kubernetes/v3/src/kubelet/grouper"
 	kubeletMetric "github.com/newrelic/nri-kubernetes/v3/src/kubelet/metric"
 	"github.com/newrelic/nri-kubernetes/v3/src/metric"
@@ -39,6 +40,7 @@ type Scraper struct {
 	defaultNetworkInterface string
 	nodeGetter              listersv1.NodeLister
 	informerClosers         []chan<- struct{}
+	filterer                definition.NamespaceFilterer
 }
 
 // ScraperOpt are options that can be used to configure the Scraper
@@ -101,7 +103,7 @@ func (s *Scraper) Run(i *integration.Integration) error {
 		return fmt.Errorf("creating Kubelet grouper: %w", err)
 	}
 
-	job := scrape.NewScrapeJob("kubelet", kubeletGrouper, metric.KubeletSpecs)
+	job := scrape.NewScrapeJob("kubelet", kubeletGrouper, metric.KubeletSpecs, scrape.JobWithFilterer(s.filterer))
 
 	r := job.Populate(i, s.config.ClusterName, s.logger, s.k8sVersion)
 	if r.Errors != nil {
@@ -119,6 +121,14 @@ func (s *Scraper) Run(i *integration.Integration) error {
 func WithLogger(logger *log.Logger) ScraperOpt {
 	return func(s *Scraper) error {
 		s.logger = logger
+		return nil
+	}
+}
+
+// WithFilterer returns an OptionFunc to add a Filterer.
+func WithFilterer(filterer definition.NamespaceFilterer) ScraperOpt {
+	return func(s *Scraper) error {
+		s.filterer = filterer
 		return nil
 	}
 }
