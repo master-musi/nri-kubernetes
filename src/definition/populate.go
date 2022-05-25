@@ -70,8 +70,8 @@ func IntegrationPopulator(config *IntegrationPopulateConfig) (bool, []error) {
 				continue
 			}
 
-			ns := metrics["namespace"].(string)
-			if !config.Filterer.IsAllowed(ns) {
+			ns, ok := metrics["namespace"].(string)
+			if ok && !config.Filterer.IsAllowed(ns) {
 				continue
 			}
 
