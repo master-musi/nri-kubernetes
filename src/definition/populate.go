@@ -8,16 +8,6 @@ import (
 	"github.com/newrelic/infra-integrations-sdk/integration"
 )
 
-type NamespaceFilterer interface {
-	IsAllowed(namespace string) bool
-}
-
-type NamespaceFilter struct{}
-
-func (nf NamespaceFilter) IsAllowed(namespace string) bool {
-	return true
-}
-
 // GuessFunc guesses from data.
 type GuessFunc func(clusterName, groupLabel, entityID string, groups RawGroups) (string, error)
 
@@ -54,7 +44,6 @@ type IntegrationPopulateConfig struct {
 	MsTypeGuesser GuessFunc
 	Groups        RawGroups
 	Specs         SpecGroups
-	Filterer      NamespaceFilterer
 }
 
 // IntegrationPopulator populates an integration with the given metrics and definition.
@@ -63,18 +52,11 @@ func IntegrationPopulator(config *IntegrationPopulateConfig) (bool, []error) {
 	var errs []error
 	var msEntityType string
 	for groupLabel, entities := range config.Groups {
-		for entityID, metrics := range entities {
+		for entityID := range entities {
 
 			// Only populate specified groups.
 			if _, ok := config.Specs[groupLabel]; !ok {
 				continue
-			}
-
-			if config.Filterer != nil {
-				ns, ok := metrics["namespace"].(string)
-				if ok && !config.Filterer.IsAllowed(ns) {
-					continue
-				}
 			}
 
 			msEntityID := entityID

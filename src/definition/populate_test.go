@@ -25,7 +25,6 @@ var rawGroupsSample = RawGroups{
 			"raw_metric_name_3": map[string]interface{}{
 				"foo": "bar",
 			},
-			"namespace": "nsA",
 		},
 		"entity_id_2": RawMetrics{
 			"raw_metric_name_1": 2,
@@ -33,7 +32,6 @@ var rawGroupsSample = RawGroups{
 			"raw_metric_name_3": map[string]interface{}{
 				"foo": "bar",
 			},
-			"namespace": "nsB",
 		},
 	},
 }
@@ -86,12 +84,6 @@ func testConfig(i *integration.Integration) *IntegrationPopulateConfig {
 		Groups:        rawGroupsSample,
 		Specs:         specs,
 	}
-}
-
-func testConfigWithFilterer(i *integration.Integration) *IntegrationPopulateConfig {
-	populator := testConfig(i)
-	populator.Filterer = NamespaceFilterMock{}
-	return populator
 }
 
 func TestIntegrationPopulator_CorrectValue(t *testing.T) {
@@ -572,24 +564,4 @@ func TestIntegrationPopulator_msTypeGuesserFuncWithError(t *testing.T) {
 	assert.Contains(t, errs, fmt.Errorf("error setting event type"))
 	assert.Contains(t, intgr.Entities, expectedEntityData1)
 	assert.Contains(t, intgr.Entities, expectedEntityData2)
-}
-
-func TestIntegrationPopulator_FilterNamespace(t *testing.T) {
-	intgr, err := integration.New("nr.test", "1.0.0", integration.InMemoryStore())
-	require.NoError(t, err)
-
-	populated, errs := IntegrationPopulator(testConfigWithFilterer(intgr))
-	assert.True(t, populated)
-	// Only cluster entity and nsB
-	assert.Equal(t, 2, len(intgr.Entities))
-	assert.Empty(t, errs)
-}
-
-type NamespaceFilterMock struct{}
-
-func (nf NamespaceFilterMock) IsAllowed(namespace string) bool {
-	if namespace == "nsA" {
-		return false
-	}
-	return true
 }
