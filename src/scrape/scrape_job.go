@@ -13,37 +13,20 @@ import (
 	"github.com/newrelic/nri-kubernetes/v3/src/definition"
 )
 
-// JobOpt are options that can be used to configure the ScrapeJob
-type JobOpt func(s *Job)
-
 // NewScrapeJob creates a new Scrape Job with the given attributes
-func NewScrapeJob(name string, grouper data.Grouper, specs definition.SpecGroups, options ...JobOpt) *Job {
-	job := &Job{
+func NewScrapeJob(name string, grouper data.Grouper, specs definition.SpecGroups) *Job {
+	return &Job{
 		Name:    name,
 		Grouper: grouper,
 		Specs:   specs,
 	}
-
-	for _, opt := range options {
-		opt(job)
-	}
-
-	return job
 }
 
 // Job hold all information specific to a certain Scrape Job, e.g.: where do I get the data from, and what data
 type Job struct {
-	Name     string
-	Grouper  data.Grouper
-	Specs    definition.SpecGroups
-	Filterer definition.NamespaceFilterer
-}
-
-// JobWithFilterer returns an OptionFunc to add a Filterer.
-func JobWithFilterer(filterer definition.NamespaceFilterer) JobOpt {
-	return func(j *Job) {
-		j.Filterer = filterer
-	}
+	Name    string
+	Grouper data.Grouper
+	Specs   definition.SpecGroups
 }
 
 // Populate will get the data using the given Group, transform it, and push it to the given Integration
@@ -71,7 +54,6 @@ func (s *Job) Populate(
 		Specs:         s.Specs,
 		MsTypeGuesser: k8sMetricSetTypeGuesser,
 		Groups:        groups,
-		Filterer:      s.Filterer,
 	}
 	ok, populateErrs := definition.IntegrationPopulator(config)
 
