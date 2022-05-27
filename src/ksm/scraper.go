@@ -13,7 +13,7 @@ import (
 
 	"github.com/newrelic/nri-kubernetes/v3/internal/config"
 	"github.com/newrelic/nri-kubernetes/v3/internal/discovery"
-	"github.com/newrelic/nri-kubernetes/v3/src/definition"
+	"github.com/newrelic/nri-kubernetes/v3/src"
 	ksmGrouper "github.com/newrelic/nri-kubernetes/v3/src/ksm/grouper"
 	"github.com/newrelic/nri-kubernetes/v3/src/metric"
 	"github.com/newrelic/nri-kubernetes/v3/src/prometheus"
@@ -40,7 +40,7 @@ type Scraper struct {
 	endpointsDiscoverer discovery.EndpointsDiscoverer
 	servicesLister      listersv1.ServiceLister
 	informerClosers     []chan<- struct{}
-	filterer            definition.NamespaceFilterer
+	filterer            src.NamespaceFilterer
 }
 
 // ScraperOpt are options that can be used to configure the Scraper
@@ -55,7 +55,7 @@ func WithLogger(logger *log.Logger) ScraperOpt {
 }
 
 // WithFilterer returns an OptionFunc to add a Filterer.
-func WithFilterer(filterer definition.NamespaceFilterer) ScraperOpt {
+func WithFilterer(filterer src.NamespaceFilterer) ScraperOpt {
 	return func(s *Scraper) error {
 		s.filterer = filterer
 		return nil
@@ -124,13 +124,14 @@ func (s *Scraper) Run(i *integration.Integration) error {
 			MetricFamiliesGetter: s.KSM.MetricFamiliesGetFunc(endpoint),
 			Queries:              metric.KSMQueries,
 			ServicesLister:       s.servicesLister,
+			Filterer:             s.filterer,
 		}, ksmGrouper.WithLogger(s.logger))
 		if err != nil {
 			return fmt.Errorf("creating KSM grouper: %w", err)
 		}
 
 		// TODO: Check if the concept of job still makes sense with the new architecture.
-		job := scrape.NewScrapeJob("kube-state-metrics", grouper, metric.KSMSpecs, scrape.JobWithFilterer(s.filterer))
+		job := scrape.NewScrapeJob("kube-state-metrics", grouper, metric.KSMSpecs)
 
 		s.logger.Debugf("Running KSM job")
 		r := job.Populate(i, s.config.ClusterName, s.logger, s.k8sVersion)

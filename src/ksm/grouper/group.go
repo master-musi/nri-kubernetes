@@ -8,6 +8,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	listersv1 "k8s.io/client-go/listers/core/v1"
 
+	"github.com/newrelic/nri-kubernetes/v3/src"
 	"github.com/newrelic/nri-kubernetes/v3/src/data"
 	"github.com/newrelic/nri-kubernetes/v3/src/definition"
 	"github.com/newrelic/nri-kubernetes/v3/src/prometheus"
@@ -22,6 +23,7 @@ type Config struct {
 	Queries              []prometheus.Query
 	MetricFamiliesGetter prometheus.FetchAndFilterMetricsFamilies
 	ServicesLister       listersv1.ServiceLister
+	Filterer             src.NamespaceFilterer
 }
 
 type OptionFunc func(kc *grouper) error
@@ -75,6 +77,10 @@ func (g *grouper) Group(specGroups definition.SpecGroups) (definition.RawGroups,
 		}
 	}
 
+	if g.Filterer != nil {
+		g.filterByNamespace(groups)
+	}
+
 	if len(errs) > 0 {
 		return groups, &data.ErrorGroup{
 			Recoverable: true,
@@ -112,4 +118,22 @@ func (g *grouper) addServiceSpecSelectorToGroup(serviceGroup map[string]definiti
 		}
 	}
 	return nil
+}
+
+func (g *grouper) filterByNamespace(groups definition.RawGroups) {
+	for group, entities := range groups {
+		for entity, metrics := range entities {
+			var ns string
+			for _, metric := range metrics {
+				m, ok := metric.(prometheus.Metric)
+				if ok {
+					ns = m.Labels["namespace"]
+				}
+				break
+			}
+			if !g.Filterer.IsAllowed(ns) {
+				delete(groups[group], entity)
+			}
+		}
+	}
 }

@@ -40,6 +40,15 @@ func (c *testClient) Do(req *http.Request) (*http.Response, error) {
 	return w.Result(), nil
 }
 
+type NamespaceFilterMock struct{}
+
+func (nf NamespaceFilterMock) IsAllowed(namespace string) bool {
+	if namespace == "kube-system" {
+		return false
+	}
+	return true
+}
+
 func rawGroupsHandlerFunc(w http.ResponseWriter, r *http.Request) {
 	switch r.URL.Path {
 	case metric.KubeletPodsPath:
@@ -116,6 +125,58 @@ func TestGroup(t *testing.T) {
 
 	assert.Nil(t, errGroup)
 	assert.Equal(t, testdata.ExpectedGroupData, r)
+
+}
+
+func TestGroup_NamespaceFiltered(t *testing.T) {
+	c := testClient{
+		handler: rawGroupsHandlerFunc,
+	}
+
+	k8sClient := fake.NewSimpleClientset(getNode())
+	nodeGetter, _ := discovery.NewNodeLister(k8sClient)
+
+	queries := []prometheus.Query{
+		{
+			MetricName: "container_memory_usage_bytes",
+			Labels: prometheus.QueryLabels{
+				Operator: prometheus.QueryOpNor,
+				Labels: prometheus.Labels{
+					"container_name": "",
+				},
+			},
+		},
+	}
+
+	podsFetcher := metric.NewPodsFetcher(
+		log.StandardLogger(),
+		&c,
+	)
+
+	kubeletClient, err := client.New(client.StaticConnector(&c, url.URL{}), client.WithMaxRetries(3))
+	require.NoError(t, err)
+
+	kubeletGrouper, err := New(
+		Config{
+			NodeGetter: nodeGetter,
+			Client:     kubeletClient,
+			Fetchers: []data.FetchFunc{
+				podsFetcher.DoPodsFetch,
+				metric.CadvisorFetchFunc(kubeletClient.MetricFamiliesGetFunc(metric.KubeletCAdvisorMetricsPath), queries),
+			},
+			DefaultNetworkInterface: "eth0",
+			Filterer:                NamespaceFilterMock{},
+		},
+	)
+	assert.Nil(t, err)
+
+	r, errGroup := kubeletGrouper.Group(nil)
+	assert.Nil(t, errGroup)
+
+	// All kube-system ns metrics are removed leaving only the default ns
+	assert.Len(t, r["pod"], 1)
+	assert.Len(t, r["container"], 1)
+	assert.Len(t, r["volume"], 0)
 
 }
 
