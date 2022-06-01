@@ -124,14 +124,13 @@ func (s *Scraper) Run(i *integration.Integration) error {
 			MetricFamiliesGetter: s.KSM.MetricFamiliesGetFunc(endpoint),
 			Queries:              metric.KSMQueries,
 			ServicesLister:       s.servicesLister,
-			Filterer:             s.filterer,
 		}, ksmGrouper.WithLogger(s.logger))
 		if err != nil {
 			return fmt.Errorf("creating KSM grouper: %w", err)
 		}
 
 		// TODO: Check if the concept of job still makes sense with the new architecture.
-		job := scrape.NewScrapeJob("kube-state-metrics", grouper, metric.KSMSpecs)
+		job := scrape.NewScrapeJob("kube-state-metrics", grouper, metric.KSMSpecs, scrape.JobWithFilterer(s.filterer))
 
 		s.logger.Debugf("Running KSM job")
 		r := job.Populate(i, s.config.ClusterName, s.logger, s.k8sVersion)

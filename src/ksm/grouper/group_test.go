@@ -13,15 +13,6 @@ import (
 	"github.com/newrelic/nri-kubernetes/v3/src/prometheus"
 )
 
-type NamespaceFilterMock struct{}
-
-func (nf NamespaceFilterMock) IsAllowed(namespace string) bool {
-	if namespace == "kube-system" {
-		return false
-	}
-	return true
-}
-
 func TestAddServiceSpecSelectorToGroup(t *testing.T) {
 	svc := &v1.Service{
 		Spec: v1.ServiceSpec{
@@ -53,9 +44,4 @@ func TestAddServiceSpecSelectorToGroup(t *testing.T) {
 	actual := serviceGroup["kube-system_kube-state-metrics"]["apiserver_kube_service_spec_selectors"].(prometheus.Metric).Labels
 	assert.Equal(t, expected["selector_l1"], actual["selector_l1"])
 	assert.Equal(t, expected["selector_l2"], actual["selector_l2"])
-}
-
-//TODO We should mock a response from KSM and ensure it's filtered
-func TestGroup_filtered(t *testing.T) {
-
 }

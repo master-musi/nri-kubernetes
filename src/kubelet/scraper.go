@@ -98,13 +98,12 @@ func (s *Scraper) Run(i *integration.Integration) error {
 				kubeletMetric.CadvisorFetchFunc(fetchAndFilterPrometheus, metric.CadvisorQueries),
 			},
 			DefaultNetworkInterface: s.defaultNetworkInterface,
-			Filterer:                s.filterer,
 		}, grouper.WithLogger(s.logger))
 	if err != nil {
 		return fmt.Errorf("creating Kubelet grouper: %w", err)
 	}
 
-	job := scrape.NewScrapeJob("kubelet", kubeletGrouper, metric.KubeletSpecs)
+	job := scrape.NewScrapeJob("kubelet", kubeletGrouper, metric.KubeletSpecs, scrape.JobWithFilterer(s.filterer))
 
 	r := job.Populate(i, s.config.ClusterName, s.logger, s.k8sVersion)
 	if r.Errors != nil {
