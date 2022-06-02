@@ -8,7 +8,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	listersv1 "k8s.io/client-go/listers/core/v1"
 
-	"github.com/newrelic/nri-kubernetes/v3/src"
 	"github.com/newrelic/nri-kubernetes/v3/src/client"
 	"github.com/newrelic/nri-kubernetes/v3/src/data"
 	"github.com/newrelic/nri-kubernetes/v3/src/definition"
@@ -25,7 +24,6 @@ type Config struct {
 	Client                  client.HTTPGetter
 	Fetchers                []data.FetchFunc
 	DefaultNetworkInterface string
-	Filterer                src.NamespaceFilterer
 }
 
 type OptionFunc func(kc *grouper) error
@@ -78,7 +76,7 @@ func (r *grouper) Group(definition.SpecGroups) (definition.RawGroups, *data.Erro
 				}
 			}
 		}
-		r.fillGroupsAndMergeNonExistent(rawGroups, g)
+		fillGroupsAndMergeNonExistent(rawGroups, g)
 	}
 
 	// TODO wrap this process in a new fetchFunc
@@ -97,7 +95,7 @@ func (r *grouper) Group(definition.SpecGroups) (definition.RawGroups, *data.Erro
 		}
 	}
 
-	r.fillGroupsAndMergeNonExistent(rawGroups, resources)
+	fillGroupsAndMergeNonExistent(rawGroups, resources)
 
 	node, err := r.NodeGetter.Get(response.Node.NodeName)
 	if err != nil {
@@ -162,17 +160,14 @@ func (r *grouper) Group(definition.SpecGroups) (definition.RawGroups, *data.Erro
 			},
 		},
 	}
-	r.fillGroupsAndMergeNonExistent(rawGroups, g)
+	fillGroupsAndMergeNonExistent(rawGroups, g)
 
 	return rawGroups, nil
 }
 
-func (r *grouper) fillGroupsAndMergeNonExistent(destination definition.RawGroups, from definition.RawGroups) {
+func fillGroupsAndMergeNonExistent(destination definition.RawGroups, from definition.RawGroups) {
 	for l, g := range from {
 		if _, ok := destination[l]; !ok {
-			if r.Filterer != nil {
-				r.filterNotAllowedNamespace(g)
-			}
 			destination[l] = g
 			continue
 		}
@@ -187,15 +182,6 @@ func (r *grouper) fillGroupsAndMergeNonExistent(destination definition.RawGroups
 					e[k] = v
 				}
 			}
-		}
-	}
-}
-
-func (r *grouper) filterNotAllowedNamespace(rawMetrics map[string]definition.RawMetrics) {
-	for n, m := range rawMetrics {
-		ns, ok := m["namespace"].(string)
-		if ok && !r.Filterer.IsAllowed(ns) {
-			delete(rawMetrics, n)
 		}
 	}
 }
